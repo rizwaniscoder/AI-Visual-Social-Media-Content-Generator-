@@ -1,18 +1,19 @@
 import streamlit as st
 from openai import OpenAI
 import os
-from datetime import date
+from datetime import datetime
 import webbrowser
+import requests
 # Initialize OpenAI client
 openai_api_key = st.text_input("Enter your OpenAI API key:")
 
 openai_client = OpenAI(api_key=openai_api_key)
 
-today = date.today()
-filename = f"generated_content_{today.strftime('%Y-%m-%d')}.txt"
+today = datetime.today()
+timestamp = today.strftime('%Y-%m-%d_%H-%M-%S')
+filename = f"generated_content_{timestamp}.txt"
 
 
-# Function to generate image based on prompt
 def generate_image(prompt):
     response = openai_client.images.generate(
         model="dall-e-3",
@@ -22,11 +23,19 @@ def generate_image(prompt):
         n=1
     )
     image_url = response.data[0].url
+
+    # Download image
+    image_data = requests.get(image_url).content
+    image_filename = f"generated_image_{timestamp}.png"
+    with open(image_filename, "wb") as img_file:
+        img_file.write(image_data)
     
     # Open image URL in a new tab
     webbrowser.open_new_tab(image_url)
     
     return image_url
+
+
 
 # Function to generate image prompt
 def generate_image_prompt():
@@ -116,6 +125,7 @@ def main():
             st.success("Image generated successfully!")
             st.image(st.session_state.image_url, caption="Generated Image", use_column_width=True)
 
+
     # Generate captions for different platforms
     generate_captions_btn = st.button("Generate Captions")
     if generate_captions_btn:
@@ -123,22 +133,22 @@ def main():
             st.error("Please generate image prompt first!")
         else:
             st.info("Generating captions...")
-            instagram_caption = generate_instagram_caption(st.session_state.image_prompt)
-            twitter_caption = generate_twitter_caption(st.session_state.image_prompt)
-            linkedin_caption = generate_linkedin_caption(st.session_state.image_prompt)
-            facebook_caption = generate_facebook_caption(st.session_state.image_prompt)
+            st.session_state.instagram_caption = generate_instagram_caption(st.session_state.image_prompt)
+            st.session_state.twitter_caption = generate_twitter_caption(st.session_state.image_prompt)
+            st.session_state.linkedin_caption = generate_linkedin_caption(st.session_state.image_prompt)
+            st.session_state.facebook_caption = generate_facebook_caption(st.session_state.image_prompt)
 
             st.write("#### Instagram Caption:")
-            st.write(instagram_caption)
+            st.write(st.session_state.instagram_caption)
 
             st.write("#### Twitter Caption:")
-            st.write(twitter_caption)
+            st.write(st.session_state.twitter_caption)
 
             st.write("#### LinkedIn Caption:")
-            st.write(linkedin_caption)
+            st.write(st.session_state.linkedin_caption)
 
             st.write("#### Facebook Caption:")
-            st.write(facebook_caption)
+            st.write(st.session_state.facebook_caption)
 
     # Sidebar to show generated image and captions
     st.sidebar.title("Generated Results")
@@ -163,7 +173,8 @@ def main():
     if 'facebook_caption' in st.session_state:
         st.sidebar.write("#### Facebook Caption:")
         st.sidebar.write(st.session_state.facebook_caption)
-
+        
+    # Download the result
     download_btn = st.button("Download Results")
     if download_btn:
         with open(filename, "w") as f:
@@ -182,7 +193,7 @@ def main():
         # Provide direct download link
         with open(filename, "rb") as f:
             data = f.read()
-        st.download_button(label="Download Results", data=data, file_name=filename)
+        st.download_button(label="Download Results By Clicking Here", data=data, file_name=filename)
 
 if __name__ == "__main__":
     main()
