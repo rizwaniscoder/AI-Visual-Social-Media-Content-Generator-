@@ -4,6 +4,7 @@ import os
 from datetime import datetime
 import webbrowser
 import requests
+
 # Initialize OpenAI client
 openai_api_key = st.text_input("Enter your OpenAI API key:")
 
@@ -12,30 +13,6 @@ openai_client = OpenAI(api_key=openai_api_key)
 today = datetime.today()
 timestamp = today.strftime('%Y-%m-%d_%H-%M-%S')
 filename = f"generated_content_{timestamp}.txt"
-
-
-def generate_image(prompt):
-    response = openai_client.images.generate(
-        model="dall-e-3",
-        prompt=prompt,
-        size="1024x1024",
-        quality="standard",
-        n=1
-    )
-    image_url = response.data[0].url
-
-    # Download image
-    image_data = requests.get(image_url).content
-    image_filename = f"generated_image_{timestamp}.png"
-    with open(image_filename, "wb") as img_file:
-        img_file.write(image_data)
-    
-    # Open image URL in a new tab
-    webbrowser.open_new_tab(image_url)
-    
-    return image_url
-
-
 
 # Function to generate image prompt
 def generate_image_prompt():
@@ -94,10 +71,98 @@ def generate_facebook_caption(semantics):
     )
     return response.choices[0].message.content
 
+# Function to generate image
+def generate_image(prompt):
+    response = openai_client.images.generate(
+        model="dall-e-3",
+        prompt=prompt,
+        size="1024x1024",
+        quality="standard",
+        n=1
+    )
+    image_url = response.data[0].url
+
+    # Download image
+    image_data = requests.get(image_url).content
+    image_filename = f"generated_image_{timestamp}.png"
+    with open(image_filename, "wb") as img_file:
+        img_file.write(image_data)
+    
+    # Open image URL in a new tab
+    webbrowser.open_new_tab(image_url)
+    
+    return image_url
+
+# Function to post on Facebook
+def post_on_facebook(image_url, caption, page_access_token, page_id):
+    post_url = f"https://graph.facebook.com/{page_id}/photos"
+
+    # Upload the image
+    image_response = requests.post(post_url, data={'url': image_url}, params={'access_token': page_access_token})
+    image_data = image_response.json()
+
+    if 'id' in image_data:
+        # Image uploaded successfully, now post the caption
+        caption_response = requests.post(f"https://graph.facebook.com/{page_id}/feed",
+                                         data={'message': caption, 'published': 'true', 'attached_media[0]': f"{'{'}'media_fbid': {image_data['id']}{'}'}"},
+                                         params={'access_token': page_access_token})
+        caption_data = caption_response.json()
+
+        if 'id' in caption_data:
+            return True
+        else:
+            return False
+    else:
+        return False
+
+# Function to post on Instagram
+def post_on_instagram(image_url, caption):
+    # You need to replace 'INSTAGRAM_ACCESS_TOKEN' with your actual Instagram Access Token
+    instagram_access_token = 'INSTAGRAM_ACCESS_TOKEN'
+    # This endpoint is just a placeholder, actual Instagram posting mechanism is more complex and requires additional steps
+    instagram_post_url = 'https://api.instagram.com/v1/media/upload/'
+
+    # Upload the image
+    image_response = requests.post(instagram_post_url, data={'url': image_url}, params={'access_token': instagram_access_token})
+    image_data = image_response.json()
+
+    if 'id' in image_data:
+        # Image uploaded successfully, now post the caption
+        caption_response = requests.post('https://api.instagram.com/v1/media/{0}/comments'.format(image_data['id']),
+                                         data={'message': caption, 'published': 'true'},
+                                         params={'access_token': instagram_access_token})
+        caption_data = caption_response.json()
+
+        if 'id' in caption_data:
+            return True
+        else:
+            return False
+    else:
+        return False
+
+# Function to post on Twitter
+def post_on_twitter(image_url, caption, bearer_token):
+    tweet_url = "https://api.twitter.com/2/tweets"
+
+    # Prepare the tweet data
+    tweet_data = {
+        'text': caption,
+        'media': {'media_url': image_url}
+    }
+
+    # Post the tweet
+    headers = {"Authorization": f"Bearer {bearer_token}", "Content-Type": "application/json"}
+    response = requests.post(tweet_url, json=tweet_data, headers=headers)
+
+    if response.status_code == 200:
+        return True
+    else:
+        return False
+
 # Main Streamlit app
 def main():
     st.title("Autonomous Social Media Content Generator")
-    st.markdown("### Business Overview for WebsitesAndRobots.com\nWebsitesAndRobots.com creates AI NexGen websites and robots. Our developers fuse expertise and cutting-edge AI technology to revolutionize businesses' operations.")
+    st.markdown("### Business Overview for WebsitesAndRobots.com\nWebsitesAndRobots.com creates AI NexGen websites and robots. Our developers fuse expertise and cutting-edge AI technology to revolutionize businesses' operations")
 
     # Generate image prompt
     user_prompt = st.text_area("Enter an image generation prompt (optional)")
@@ -149,6 +214,45 @@ def main():
 
             st.write("#### Facebook Caption:")
             st.write(st.session_state.facebook_caption)
+
+            # After generating captions, trigger social media postings
+            st.info("All content generated. Now triggering social media postings...")
+
+            # Get access tokens for social media platforms
+            page_access_token = st.text_input("Enter your Facebook Page Access Token:")
+            instagram_access_token = st.text_input("Enter your Instagram Access Token:")
+            twitter_bearer_token = st.text_input("Enter your Twitter Bearer Token:")
+
+            # Post on Facebook
+            if page_access_token:
+                post_on_facebook_btn = st.button("Post on Facebook")
+                if post_on_facebook_btn:
+                    facebook_post_status = post_on_facebook(st.session_state.image_url, st.session_state.facebook_caption, page_access_token, 'PAGE_ID')
+                    if facebook_post_status:
+                        st.success("Posted on Facebook successfully!")
+                    else:
+                        st.error("Failed to post on Facebook.")
+
+            # Post on Instagram
+            if instagram_access_token:
+                post_on_instagram_btn = st.button("Post on Instagram")
+                if post_on_instagram_btn:
+                    instagram_post_status = post_on_instagram(st.session_state.image_url, st.session_state.instagram_caption, instagram_access_token)
+                    if instagram_post_status:
+                        st.success("Posted on Instagram successfully!")
+                    else:
+                        st.error("Failed to post on Instagram.")
+
+            # Post on Twitter
+            if twitter_bearer_token:
+                post_on_twitter_btn = st.button("Post on Twitter")
+                if post_on_twitter_btn:
+                    twitter_post_status = post_on_twitter(st.session_state.image_url, st.session_state.twitter_caption, twitter_bearer_token)
+                    if twitter_post_status:
+                        st.success("Posted on Twitter successfully!")
+                    else:
+                        st.error("Failed to post on Twitter.")
+
 
     # Sidebar to show generated image and captions
     st.sidebar.title("Generated Results")
