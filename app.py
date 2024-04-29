@@ -237,7 +237,7 @@ def main():
             if instagram_access_token:
                 post_on_instagram_btn = st.button("Post on Instagram")
                 if post_on_instagram_btn:
-                    instagram_post_status = post_on_instagram(st.session_state.image_url, st.session_state.instagram_caption, instagram_access_token)
+                    instagram_post_status = post_on_instagram(st.session_state.image_url, st.session_state.instagram_caption)
                     if instagram_post_status:
                         st.success("Posted on Instagram successfully!")
                     else:
